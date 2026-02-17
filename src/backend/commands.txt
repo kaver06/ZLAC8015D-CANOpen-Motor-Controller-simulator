@@ -1,0 +1,19 @@
+/******Motor driver state machine*********/
+
+	//READY_TO_SWITCH_ON (0x06)
+cansend vcan0 601#2B40600006000000
+
+//SWITCHED_ON (0x07)
+cansend vcan0 601#2B40600007000000
+
+//OPERATION_ENABLE (0x0F)
+cansend vcan0 601#2B4060000F000000
+
+/******NMT master state*********/
+
+//set to operational
+cansend vcan0 000#0101
+
+//set rpm to 100
+cansend vcan0 601#23FF600164000000
+
