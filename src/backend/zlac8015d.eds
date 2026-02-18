@@ -78,6 +78,209 @@ AccessType=ro
 DefaultValue=0
 PDOMapping=1
 
+[6064]
+ParameterName=Position actual value
+ObjectType=0x8
+SubNumber=3
+
+[6064sub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[6064sub1]
+ParameterName=Position actual value (left)
+ObjectType=0x7
+DataType=0x0004
+AccessType=ro
+DefaultValue=0
+PDOMapping=1
+
+[6064sub2]
+ParameterName=Position actual value (right)
+ObjectType=0x7
+DataType=0x0004
+AccessType=ro
+DefaultValue=0
+PDOMapping=1
+
+[607A]
+ParameterName=Target position
+ObjectType=0x8
+SubNumber=3
+
+[607Asub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[607Asub1]
+ParameterName=Target position (left)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=0
+PDOMapping=1
+
+[607Asub2]
+ParameterName=Target position (right)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=0
+PDOMapping=1
+
+[6071]
+ParameterName=Target torque
+ObjectType=0x8
+SubNumber=3
+
+[6071sub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[6071sub1]
+ParameterName=Target torque (left)
+ObjectType=0x7
+DataType=0x0003
+AccessType=rw
+DefaultValue=0
+PDOMapping=1
+
+[6071sub2]
+ParameterName=Target torque (right)
+ObjectType=0x7
+DataType=0x0003
+AccessType=rw
+DefaultValue=0
+PDOMapping=1
+
+[6077]
+ParameterName=Torque actual value
+ObjectType=0x8
+SubNumber=3
+
+[6077sub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[6077sub1]
+ParameterName=Torque actual value (left)
+ObjectType=0x7
+DataType=0x0003
+AccessType=ro
+DefaultValue=0
+PDOMapping=1
+
+[6077sub2]
+ParameterName=Torque actual value (right)
+ObjectType=0x7
+DataType=0x0003
+AccessType=ro
+DefaultValue=0
+PDOMapping=1
+
+[6081]
+ParameterName=Profile velocity
+ObjectType=0x8
+SubNumber=3
+
+[6081sub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[6081sub1]
+ParameterName=Profile velocity (left)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=1000
+PDOMapping=0
+
+[6081sub2]
+ParameterName=Profile velocity (right)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=1000
+PDOMapping=0
+
+[6083]
+ParameterName=Profile acceleration
+ObjectType=0x8
+SubNumber=3
+
+[6083sub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[6083sub1]
+ParameterName=Profile acceleration (left)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=100
+PDOMapping=0
+
+[6083sub2]
+ParameterName=Profile acceleration (right)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=100
+PDOMapping=0
+
+[6084]
+ParameterName=Profile deceleration
+ObjectType=0x8
+SubNumber=3
+
+[6084sub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[6084sub1]
+ParameterName=Profile deceleration (left)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=100
+PDOMapping=0
+
+[6084sub2]
+ParameterName=Profile deceleration (right)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=100
+PDOMapping=0
+
 ; --- TPDO 1 Configuration ---
 [1800]
 ParameterName=TPDO1 Communication Parameter
