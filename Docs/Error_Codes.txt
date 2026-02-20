@@ -1,0 +1,31 @@
+3.1 Left Motor Error Bits (Low Word: Bits 0–15)
+Bit No.	Hex Value	Error Name				Description
+0	0x00000001	Over-voltage			DC bus voltage exceeds limit
+1	0x00000002	Under-voltage			DC bus voltage below limit
+2	0x00000004	Over-current			Motor phase current exceeded limit
+3	0x00000008	Overload			Mechanical load exceeded rated torque
+4	0x00000010	Current tolerance		Current out of tolerance (Reserved)
+5	0x00000020	Encoder tolerance		Encoder signal out of tolerance
+6	0x00000040	Velocity tolerance		Velocity out of tolerance (Reserved)
+7	0x00000080	Reference voltage error		Reference voltage out of range
+8	0x00000100	EEPROM error			EEPROM read/write failure
+9	0x00000200	Hall error			Hall sensor signal error
+10	0x00000400	Over temperature		Motor temperature exceeds limit
+11	0x00000800	Encoder error			Encoder signal failure
+13	0x00002000	Speed setting error		Commanded speed exceeds rated speed
+
+3.2 Right Motor Error Bits (High Word: Bits 16–31)
+
+16	0x00010000	Over-voltage			DC bus voltage exceeds limit
+17	0x00020000	Under-voltage			DC bus voltage below limit
+18	0x00040000	Over-current			Motor phase current exceeded limit
+19	0x00080000	Overload			Mechanical load exceeded rated torque
+20	0x00100000	Current tolerance		Current out of tolerance (Reserved)
+21	0x00200000	Encoder tolerance		Encoder signal out of tolerance
+22	0x00400000	Velocity tolerance		Velocity out of tolerance (Reserved)
+23	0x00800000	Reference voltage error		Reference voltage out of range
+24	0x01000000	EEPROM error			EEPROM read/write failure
+25	0x02000000	Hall error			Hall sensor signal error
+26	0x04000000	Over temperature		Motor temperature exceeds limit
+27	0x08000000	Encoder error			Encoder signal failure
+29	0x20000000	Speed setting error		Commanded speed exceeds rated speed

@@ -1,6 +1,6 @@
 /******Motor driver state machine*********/
 //Switch_ON_Disabled
-cansend vcan0 601#2F60600004000000
+cansend vcan0 601#2B60600004000000
 
 //READY_TO_SWITCH_ON (0x06)
 cansend vcan0 601#2B40600006000000
@@ -24,8 +24,8 @@ cansend vcan0 000#0101
 //switch mode of operation to velocity mode (default mode)
 cansend vcan0 601#2F60600003000000
 
-//set left rpm to 100
-cansend vcan0 601#23FF600164000000
+//set left rpm to 200
+cansend vcan0 601#23FF6001C8000000
 
 //set left rpm to -50
 cansend vcan0 601#23FF6001CEFFFFFF
@@ -44,11 +44,11 @@ cansend vcan0 601#237A600110270000
 //set the right target counts to 5000
 cansend vcan0 601#237A600288130000
 
-//change profile velocity of left to 250rpm(set 2500) (defaut 100rpm)
-cansend vcan0 601#23816001C4090000
+//change profile velocity of left to 200rpm
+cansend vcan0 601#23816001C8000000
 
-//change profile velocity of right to 250rpm(set 2500)
-cansend vcan0 601#23816002C4090000
+//change profile velocity of right to 50rpm
+cansend vcan0 601#23816002320000
 
 
 ----------**********------------
@@ -61,3 +61,11 @@ cansend vcan0 601#2B716001F4010000
 
 //set the right target torque to 250mA
 cansend vcan0 601#2B716002FA000000
+
+
+cansend vcan0 000#8001
+cansend vcan0 601#2B60600004000000
+cansend vcan0 601#2B40600006000000
+cansend vcan0 601#2B40600007000000
+cansend vcan0 601#2B4060000F000000
+cansend vcan0 000#0101

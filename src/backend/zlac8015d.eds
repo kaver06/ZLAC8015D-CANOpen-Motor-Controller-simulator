@@ -25,6 +25,24 @@ AccessType=rw
 DefaultValue=500
 PDOMapping=0
 
+; --- ZLTECH Custom Manufacturer Registers ---
+[2008]
+ParameterName=Motor max speed
+ObjectType=0x7
+DataType=0x0006
+AccessType=rw
+DefaultValue=1000
+PDOMapping=1
+
+; --- CiA 402 Standard & Proprietary Registers ---
+[603F]
+ParameterName=Error_code
+ObjectType=0x7
+DataType=0x0007
+AccessType=ro
+DefaultValue=0
+PDOMapping=1
+
 [6040]
 ParameterName=Controlword
 ObjectType=0x7
@@ -208,20 +226,20 @@ DefaultValue=2
 PDOMapping=0
 
 [6081sub1]
-ParameterName=Profile velocity (left)
+ParameterName=Profile_velocity (left)
 ObjectType=0x7
-DataType=0x0004
+DataType=0x0007
 AccessType=rw
-DefaultValue=1000
-PDOMapping=0
+DefaultValue=120
+PDOMapping=1
 
 [6081sub2]
-ParameterName=Profile velocity (right)
+ParameterName=Profile_velocity (right)
 ObjectType=0x7
-DataType=0x0004
+DataType=0x0007
 AccessType=rw
-DefaultValue=1000
-PDOMapping=0
+DefaultValue=120
+PDOMapping=1
 
 [6083]
 ParameterName=Profile acceleration
@@ -237,20 +255,20 @@ DefaultValue=2
 PDOMapping=0
 
 [6083sub1]
-ParameterName=Profile acceleration (left)
+ParameterName=Profile_acceleration (left)
 ObjectType=0x7
-DataType=0x0004
+DataType=0x0007
 AccessType=rw
-DefaultValue=100
-PDOMapping=0
+DefaultValue=500
+PDOMapping=1
 
 [6083sub2]
-ParameterName=Profile acceleration (right)
+ParameterName=Profile_acceleration (right)
 ObjectType=0x7
-DataType=0x0004
+DataType=0x0007
 AccessType=rw
-DefaultValue=100
-PDOMapping=0
+DefaultValue=500
+PDOMapping=1
 
 [6084]
 ParameterName=Profile deceleration
@@ -266,20 +284,49 @@ DefaultValue=2
 PDOMapping=0
 
 [6084sub1]
-ParameterName=Profile deceleration (left)
+ParameterName=Profile_deceleration (left)
 ObjectType=0x7
-DataType=0x0004
+DataType=0x0007
 AccessType=rw
-DefaultValue=100
-PDOMapping=0
+DefaultValue=500
+PDOMapping=1
 
 [6084sub2]
-ParameterName=Profile deceleration (right)
+ParameterName=Profile_deceleration (right)
+ObjectType=0x7
+DataType=0x0007
+AccessType=rw
+DefaultValue=500
+PDOMapping=1
+
+[60FF]
+ParameterName=Target velocity
+ObjectType=0x8
+SubNumber=3
+
+[60FFsub0]
+ParameterName=Number of entries
+ObjectType=0x7
+DataType=0x0005
+AccessType=ro
+DefaultValue=2
+PDOMapping=0
+
+[60FFsub1]
+ParameterName=Target velocity (left)
 ObjectType=0x7
 DataType=0x0004
 AccessType=rw
-DefaultValue=100
-PDOMapping=0
+DefaultValue=0
+PDOMapping=1
+
+[60FFsub2]
+ParameterName=Target velocity (right)
+ObjectType=0x7
+DataType=0x0004
+AccessType=rw
+DefaultValue=0
+PDOMapping=1
 
 ; --- TPDO 1 Configuration ---
 [1800]
@@ -422,33 +469,3 @@ DataType=0x0007
 AccessType=rw
 DefaultValue=0
 PDOMapping=0
-
-
-[60FF]
-ParameterName=Target velocity
-ObjectType=0x8
-SubNumber=3
-
-[60FFsub0]
-ParameterName=Number of entries
-ObjectType=0x7
-DataType=0x0005
-AccessType=ro
-DefaultValue=2
-PDOMapping=0
-
-[60FFsub1]
-ParameterName=Target velocity (left)
-ObjectType=0x7
-DataType=0x0004
-AccessType=rw
-DefaultValue=0
-PDOMapping=1
-
-[60FFsub2]
-ParameterName=Target velocity (right)
-ObjectType=0x7
-DataType=0x0004
-AccessType=rw
-DefaultValue=0
-PDOMapping=1

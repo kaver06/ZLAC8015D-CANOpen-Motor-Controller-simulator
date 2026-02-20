@@ -1,218 +1,184 @@
 import canopen
-import time
 import os
-import sys
 import threading
-
-# --- FIX: Dynamically add the backend folder to Python's path ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
-
-from state_machine import CiA402StateMachine
-from physics_sim import MotorPhysics
+import time
+from .state_machine import CiA402StateMachine
+from .driver_logic import MotorDriverLogic
 
 class MotorControllerSimulator:
     def __init__(self, interface='vcan0', node_id=1):
         self.network = canopen.Network()
+        self.network.connect(bustype='socketcan', channel=interface)
         self.node_id = node_id
-        self.state_machine = CiA402StateMachine()
-        self.physics = MotorPhysics()
-        
-        print(f"Connecting to {interface}...")
-        self.network.connect(channel=interface, bustype='socketcan')
-        
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        eds_path = os.path.join(current_dir, 'zlac8015d.eds')
-        
-        print(f"Initializing ZLAC8015D Simulator at Node-ID {self.node_id}...")
-        self.node = canopen.LocalNode(self.node_id, eds_path)
-        self.network.add_node(self.node)
-        
-        # Initialize memory registers
-        self.node.sdo[0x6041].phys = 0      # Status
-        self.node.sdo[0x6060].phys = 3      # Mode (Default 3 = Velocity)
-        
-        self.node.sdo[0x606C][1].phys = 0   # Actual Vel L
-        self.node.sdo[0x606C][2].phys = 0   # Actual Vel R
-        self.node.sdo[0x60FF][1].phys = 0   # Target Vel L
-        self.node.sdo[0x60FF][2].phys = 0   # Target Vel R
-        
-        self.node.sdo[0x6064][1].phys = 0   # Actual Pos L
-        self.node.sdo[0x6064][2].phys = 0   # Actual Pos R
-        self.node.sdo[0x607A][1].phys = 0   # Target Pos L
-        self.node.sdo[0x607A][2].phys = 0   # Target Pos R
-        
-        self.node.sdo[0x6077][1].phys = 0   # Actual Trq L
-        self.node.sdo[0x6077][2].phys = 0   # Actual Trq R
-        self.node.sdo[0x6071][1].phys = 0   # Target Trq L
-        self.node.sdo[0x6071][2].phys = 0   # Target Trq R
-        
-        self.node.sdo[0x6081][1].phys = 1000 # Default 100.0 RPM
-        self.node.sdo[0x6081][2].phys = 1000
-        self.node.sdo[0x6083][1].phys = 200  # Default 200 RPM/s accel
-        self.node.sdo[0x6083][2].phys = 200
-        self.node.sdo[0x6084][1].phys = 200  # Default 200 RPM/s decel
-        self.node.sdo[0x6084][2].phys = 200
-        
-        self.setup_pdos()
-        self.setup_callbacks()
-        self.physics.start()
 
-    def setup_pdos(self):
-        self.node.tpdo.read()
+        # Load EDS as a LOCAL SERVER (The Virtual Motor)
+        eds_path = os.path.join(os.path.dirname(__file__), 'zlac8015d.eds')
+        self.node = self.network.create_node(self.node_id, eds_path)
+
+        # Attach State Machine and the Cascaded Driver Logic
+        self.state_machine = CiA402StateMachine()
+        self.physics = MotorDriverLogic()
+
+        # Link SDOs
+        self.status_var = self.node.sdo[0x6041]
+        self.status_var.phys = self.state_machine.status_word
+
+        # Setup Kinematic Defaults to ZLTECH Factory Specs
+        self.node.sdo[0x6081][1].phys = 120  # Cruising Speed: 120 RPM
+        self.node.sdo[0x6081][2].phys = 120
         
+        self.node.sdo[0x6083][1].phys = 500  # Acceleration Time: 500 ms
+        self.node.sdo[0x6083][2].phys = 500
+        
+        self.node.sdo[0x6084][1].phys = 500  # Deceleration Time: 500 ms
+        self.node.sdo[0x6084][2].phys = 500
+
+        # --- THE FIX: The official python-canopen local callback! ---
+        # This one line catches EVERY SDO write sent by the master
+        self.node.add_write_callback(self.on_sdo_write)
+        # ------------------------------------------------------------
+
+        # TPDO Mapping
+        self.node.tpdo.read()
         self.node.tpdo[1].clear()
-        self.status_var = self.node.tpdo[1].add_variable(0x6041)
-        self.status_var.phys = 0
+        self.node.tpdo[1].add_variable(0x6041) # Status Word
         self.node.tpdo[1].trans_type = 254
         self.node.tpdo[1].event_timer = 100
         self.node.tpdo[1].enabled = True
-        
+
         self.node.tpdo[2].clear()
-        self.vel_l_var = self.node.tpdo[2].add_variable(0x606C, 1)
-        self.vel_r_var = self.node.tpdo[2].add_variable(0x606C, 2)
-        self.vel_l_var.phys = 0
-        self.vel_r_var.phys = 0
+        self.node.tpdo[2].add_variable(0x606C, 1) # Left Vel
+        self.node.tpdo[2].add_variable(0x606C, 2) # Right Vel
         self.node.tpdo[2].trans_type = 254
         self.node.tpdo[2].event_timer = 100
         self.node.tpdo[2].enabled = True
-        
+
         self.node.tpdo.save()
 
-    def setup_callbacks(self):
-        self.node.add_write_callback(self.on_sdo_write)
-        self.network.subscribe(0x000, self.on_nmt_command)
+    def on_sdo_write(self, **kwargs):
+        """Heavily instrumented callback to catch silent background crashes"""
+        try:
+            index = kwargs.get('index')
+            subindex = kwargs.get('subindex')
+            data = kwargs.get('data') 
+            
+            print(f"\n[SDO RECV] Index: 0x{index:04X}, Sub: {subindex}, Raw Data: {data.hex() if data else 'None'}")
+            
+            if index == 0x6040: 
+                control_value = int.from_bytes(data, byteorder='little')
+                print(f"  -> State Machine Processing Control Word: 0x{control_value:04X}")
+                
+                cw_fault_reset = (control_value >> 7) & 1
+                if self.state_machine.state == 'FAULT' and cw_fault_reset:
+                    print("  -> [FAULT RESET] Master cleared the fault. Restarting Drive.")
+                    # --- ZLTECH FIX: Clear the proprietary error code memory ---
+                    self.physics.zlac_error_code = 0x00000000
+                    if 0x603F in self.node.object_dictionary:
+                        self.node.object_dictionary[0x603F].raw = (0).to_bytes(4, 'little')
 
-    def on_nmt_command(self, can_id, data, timestamp):
-        if len(data) >= 2:
-            cmd = data[0]
-            node = data[1]
-            if node == self.node_id or node == 0x00:
-                if cmd == 0x01: # Start Node (Operational)
-                    self.node.nmt.state = 'OPERATIONAL'
+                old_state = self.state_machine.state
+                new_status_word = self.state_machine.process_control_word(control_value)
+                print(f"  -> Transition: {old_state} -> {self.state_machine.state} (New Status: 0x{new_status_word:04X})")
+                
+                # Safely write to internal memory without looping back to the CAN bus
+                self.node.object_dictionary[0x6041].raw = new_status_word.to_bytes(2, 'little')
+                
+                drive_is_ready = (self.state_machine.state == "OPERATION_ENABLE")
+                nmt_is_operational = (self.node.nmt.state == 'OPERATIONAL')
+                self.physics.set_enabled(drive_is_ready and nmt_is_operational)
+
+            elif index == 0x6060: 
+                mode = int.from_bytes(data, byteorder='little', signed=True)
+                self.physics.set_mode(mode)
+                print(f"  -> Switched to Mode: {mode}")
+
+            elif index == 0x60FF: 
+                raw_target = int.from_bytes(data, byteorder='little', signed=True)
+                # --- ZLTECH FIX: Target Velocity is exactly 1 r/min units! ---
+                t_left = float(raw_target) if subindex == 1 else self.physics.target_velocity_left
+                t_right = float(raw_target) if subindex == 2 else self.physics.target_velocity_right
+                self.physics.update_velocity_target(t_left, t_right)
+                print(f"  -> Updated Target Velocity: L={t_left}, R={t_right}")
+
+            elif index == 0x607A: 
+                raw_target = int.from_bytes(data, byteorder='little', signed=True)
+                t_left = raw_target if subindex == 1 else self.physics.target_position_left
+                t_right = raw_target if subindex == 2 else self.physics.target_position_right
+                self.physics.update_position_target(t_left, t_right)
+
+            elif index == 0x6071: 
+                raw_target = int.from_bytes(data, byteorder='little', signed=True)
+                t_left = raw_target if subindex == 1 else self.physics.target_torque_left
+                t_right = raw_target if subindex == 2 else self.physics.target_torque_right
+                self.physics.update_torque_target(t_left, t_right)
+                
+            elif index in [0x6081, 0x6083, 0x6084]:
+                p_vel_l = self.node.sdo[0x6081][1].phys
+                p_vel_r = self.node.sdo[0x6081][2].phys
+                p_acc_l = self.node.sdo[0x6083][1].phys
+                p_acc_r = self.node.sdo[0x6083][2].phys
+                p_dec_l = self.node.sdo[0x6084][1].phys
+                p_dec_r = self.node.sdo[0x6084][2].phys
+                self.physics.update_kinematic_profiles(p_vel_l, p_vel_r, p_acc_l, p_acc_r, p_dec_l, p_dec_r)
+
+        except Exception as e:
+            import traceback
+            print(f"\n!!! [CRASH IN SDO WRITE THREAD] !!!\n{traceback.format_exc()}")
+
+    def _hardware_watchdog_loop(self):
+        """Watches for NMT state changes and hardware smoke."""
+        last_nmt_state = self.node.nmt.state
+        
+        while True:
+            # 1. Check for NMT State Changes (Network Safety)
+            current_nmt_state = self.node.nmt.state
+            if current_nmt_state != last_nmt_state:
+                if current_nmt_state == 'OPERATIONAL':
                     self.node.tpdo[1].start(0.1)
                     self.node.tpdo[2].start(0.1)
-                    
-                    # Ensure physics engine wakes up if Drive was already Enabled
                     drive_is_ready = (self.state_machine.state == "OPERATION_ENABLE")
                     self.physics.set_enabled(drive_is_ready)
-                    
                     print(f"[NMT] Node {self.node_id} is now OPERATIONAL.")
-                    
-                elif cmd in [0x02, 0x80, 0x81, 0x82]: # Stop, Pre-Op, Reset
-                    self.node.nmt.state = 'STOPPED' if cmd == 0x02 else 'PRE-OPERATIONAL'
-                    
-                    # --- FIX: UNCONDITIONAL HARDWARE SAFETY SHUTDOWN ---
-                    print(f"[NMT] Safety Triggered: Node is no longer OPERATIONAL. Cutting motor power!")
+                else:
+                    print(f"[NMT] Safety Triggered: Node is {current_nmt_state}. Cutting motor power!")
                     self.state_machine.force_shutdown() 
-                    
-                    # Force the CANopen memory to instantly reflect the disabled state
                     self.status_var.phys = self.state_machine.status_word 
-                    
-                    # Kill the physics engine
                     self.physics.set_enabled(False)
-                    
-                    # Stop broadcasting PDOs
                     self.node.tpdo[1].stop()
                     self.node.tpdo[2].stop()
+                last_nmt_state = current_nmt_state
 
-    def on_sdo_write(self, **kwargs):
-        index = kwargs.get('index')
-        subindex = kwargs.get('subindex')
-        data = kwargs.get('data') 
-        
-        # 1. State Machine (0x6040)
-        if index == 0x6040: 
-            control_value = int.from_bytes(data, byteorder='little')
-            new_status_word = self.state_machine.process_control_word(control_value)
-            self.status_var.phys = new_status_word
-            
-            drive_is_ready = (self.state_machine.state == "OPERATION_ENABLE")
-            nmt_is_operational = (self.node.nmt.state == 'OPERATIONAL')
-            
-            self.physics.set_enabled(drive_is_ready and nmt_is_operational)
+            # 2. Check for Hardware Faults (Physical Safety)
+            # --- ZLTECH FIX: Use zlac_error_code and update 0x603F ---
+            if self.physics.zlac_error_code != 0x00000000 and self.state_machine.state != 'FAULT':
+                self.state_machine.trigger_fault()
+                self.status_var.phys = self.state_machine.status_word
+                self.physics.set_enabled(False) # Physically kill power
+                
+                # Write to the official 0x603F ZLTECH error registry
+                if 0x603F in self.node.object_dictionary:
+                    self.node.object_dictionary[0x603F].raw = self.physics.zlac_error_code.to_bytes(4, 'little')
+                
+                self.node.emcy.send(0xFF00, 0x01) 
+                print(f"\n[🚨 ZLAC FAULT 🚨] Drive locked! Read 0x603F for details. Code: 0x{self.physics.zlac_error_code:08X}")
+                
+            time.sleep(0.05) # Check 20 times a second
 
-            if drive_is_ready and not nmt_is_operational:
-                print("[WARNING] Drive Enabled but NMT is PRE-OP. Motor power is BLOCKED.")
-
-        # 2. Mode Switch (0x6060)
-        elif index == 0x6060: 
-            mode = int.from_bytes(data, byteorder='little', signed=True)
-            self.physics.set_mode(mode)
-            mode_str = {1: "Position", 3: "Velocity", 4: "Torque"}.get(mode, "Unknown")
-            print(f"\n[Mode Config] Switched to Profile {mode_str} Mode ({mode})")
-
-        # 3. Target Velocity (0x60FF)
-        elif index == 0x60FF: 
-            raw_target = int.from_bytes(data, byteorder='little', signed=True)
-            t_left = raw_target * 10 if subindex == 1 else self.physics.target_velocity_left
-            t_right = raw_target * 10 if subindex == 2 else self.physics.target_velocity_right
-            self.physics.update_velocity_target(t_left, t_right)
-
-        # 4. Target Position (0x607A)
-        elif index == 0x607A: 
-            raw_target = int.from_bytes(data, byteorder='little', signed=True)
-            t_left = raw_target if subindex == 1 else self.physics.target_position_left
-            t_right = raw_target if subindex == 2 else self.physics.target_position_right
-            self.physics.update_position_target(t_left, t_right)
-
-        # 5. Target Torque (0x6071)
-        elif index == 0x6071: 
-            raw_target = int.from_bytes(data, byteorder='little', signed=True)
-            t_left = raw_target if subindex == 1 else self.physics.target_torque_left
-            t_right = raw_target if subindex == 2 else self.physics.target_torque_right
-            self.physics.update_torque_target(t_left, t_right)
-            
-        # 6. Kinematic Profile Limits (0x6081, 0x6083, 0x6084)
-        elif index in [0x6081, 0x6083, 0x6084]:
-            p_vel_l = self.node.sdo[0x6081][1].phys
-            p_vel_r = self.node.sdo[0x6081][2].phys
-            p_acc_l = self.node.sdo[0x6083][1].phys
-            p_acc_r = self.node.sdo[0x6083][2].phys
-            p_dec_l = self.node.sdo[0x6084][1].phys
-            p_dec_r = self.node.sdo[0x6084][2].phys
-            self.physics.update_kinematic_profiles(p_vel_l, p_vel_r, p_acc_l, p_acc_r, p_dec_l, p_dec_r)
-                   
-
+    def update_pdos(self):
+        while True:
+            if self.node.nmt.state == 'OPERATIONAL':
+                self.node.sdo[0x606C][1].phys = int(self.physics.current_velocity_left)
+                self.node.sdo[0x606C][2].phys = int(self.physics.current_velocity_right)
+            time.sleep(0.05)
 
     def start(self):
-        def update_od_from_physics():
-            while True:
-                with self.physics.lock:
-                    vl = int(self.physics.current_velocity_left)
-                    vr = int(self.physics.current_velocity_right)
-                    pl = int(self.physics.current_position_left)
-                    pr = int(self.physics.current_position_right)
-                    tl = int(self.physics.current_torque_left)
-                    tr = int(self.physics.current_torque_right)
-                
-                # Direct updates to TPDO buffers
-                self.vel_l_var.phys = vl
-                self.vel_r_var.phys = vr
-                
-                # Update memory for Position and Torque (Master can read these via SDO)
-                self.node.sdo[0x6064][1].raw = pl.to_bytes(4, byteorder='little', signed=True)
-                self.node.sdo[0x6064][2].raw = pr.to_bytes(4, byteorder='little', signed=True)
-                self.node.sdo[0x6077][1].raw = tl.to_bytes(2, byteorder='little', signed=True)
-                self.node.sdo[0x6077][2].raw = tr.to_bytes(2, byteorder='little', signed=True)
-                
-                time.sleep(0.05)
-                
-        threading.Thread(target=update_od_from_physics, daemon=True).start()
+        # 1. Start the CANopen loop
+        self.pdo_thread = threading.Thread(target=self.update_pdos, daemon=True)
+        self.pdo_thread.start()
         
-        nmt_state_map = {'INITIALISING': 0x00, 'STOPPED': 0x04, 'OPERATIONAL': 0x05, 'PRE-OPERATIONAL': 0x7F}
-        self.node.nmt.state = 'PRE-OPERATIONAL'
+        # 2. Start the Virtual Microprocessor & Motor Physics
+        self.physics.start()
         
-        try:
-            while True:
-                state_byte = nmt_state_map.get(self.node.nmt.state, 0x7F)
-                self.network.send_message(0x700 + self.node_id, [state_byte])
-                time.sleep(0.5)
-        except KeyboardInterrupt:
-            self.physics.stop()
-            self.network.disconnect()
-
-if __name__ == "__main__":
-    sim = MotorControllerSimulator()
-    sim.start()
+        # 3. Start the Hardware Safety Monitor
+        self.watchdog_thread = threading.Thread(target=self._hardware_watchdog_loop, daemon=True)
+        self.watchdog_thread.start()
